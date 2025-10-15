@@ -1,8 +1,8 @@
 package com.ems.app.controller;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
-import java.util.Random;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -10,6 +10,8 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.ems.app.pojo.ConfirmationForm;
 import com.ems.app.pojo.Employee;
@@ -21,38 +23,75 @@ public class EmployeeController {
     @Autowired
     private EmployeeRepo employeeRepo;
 
-    // Display the home page (employee list)
     @GetMapping("/")
-    public String getIndex(Model model) {
-        List<Employee> employeeList = employeeRepo.findAll();
-        model.addAttribute("employees", employeeList);
+    public String getIndex(Model model, @RequestParam(required = false) String searchKeyword) {
+        List<Employee> employees = employeeRepo.findAll();
+        model.addAttribute("employees", employees);
         model.addAttribute("employee", new Employee());
         model.addAttribute("confirmationForm", new ConfirmationForm());
+        model.addAttribute("searchKeyword", searchKeyword != null ? searchKeyword : "");
         return "index";
     }
 
-    // Create a new employee
-    @PostMapping("/create")
-    public String newEmployee(@ModelAttribute Employee employee, Model model) {
-        // Create dynamic Employee ID
-        String empId = "EMP" + (1000 + new Random().nextInt(9000));
-        employee.setId(empId);
+    @GetMapping("/search")
+    public String searchEmployees(@RequestParam("keyword") String keyword, Model model) {
+        List<Employee> employees = employeeRepo.findAll();
 
-        // Save to database
+        List<Employee> filtered = employees.stream()
+                .filter(emp ->
+                        emp.getEmployeeName().toLowerCase().contains(keyword.toLowerCase()) ||
+                                emp.getEmployeeRole().toLowerCase().contains(keyword.toLowerCase()))
+                .toList();
+
+        model.addAttribute("employees", filtered);
+        model.addAttribute("employee", new Employee());
+        model.addAttribute("confirmationForm", new ConfirmationForm());
+        model.addAttribute("searchKeyword", keyword);
+
+        return "index";
+    }
+
+    @PostMapping("/create")
+    public String newEmployee(@ModelAttribute Employee employee, RedirectAttributes redirectAttributes) {
+        List<Employee> all = employeeRepo.findAll();
+
+        // Check for duplicate email
+        boolean emailExists = all.stream()
+                .anyMatch(emp -> emp.getEmployeeEmail().equalsIgnoreCase(employee.getEmployeeEmail()));
+
+        if (emailExists) {
+            redirectAttributes.addFlashAttribute("errorMessage", "⚠️ Email already in use! Please use another email.");
+            return "redirect:/";
+        }
+
+        int nextId = 1;
+        if (!all.isEmpty()) {
+            Optional<Integer> max = all.stream()
+                    .map(emp -> {
+                        try {
+                            return Integer.parseInt(emp.getId().replace("EMP", ""));
+                        } catch (NumberFormatException e) {
+                            return 0;
+                        }
+                    })
+                    .max(Comparator.naturalOrder());
+            if (max.isPresent()) {
+                nextId = max.get() + 1;
+            }
+        }
+
+        employee.setId("EMP" + nextId);
         employeeRepo.save(employee);
 
         return "redirect:/";
     }
 
-    // Update an existing employee
     @PostMapping("/update")
-    public String updateEmployee(@ModelAttribute Employee employee, Model model) {
-        Optional<Employee> existingEmployee = employeeRepo.findById(employee.getId());
+    public String updateEmployee(@ModelAttribute Employee employee) {
+        Optional<Employee> existing = employeeRepo.findById(employee.getId());
+        if (existing.isPresent()) {
+            Employee e = existing.get();
 
-        if (existingEmployee.isPresent()) {
-            Employee e = existingEmployee.get();
-
-            // Only update fields that are filled
             if (employee.getEmployeeName() != null && !employee.getEmployeeName().isEmpty())
                 e.setEmployeeName(employee.getEmployeeName());
 
@@ -72,34 +111,22 @@ public class EmployeeController {
                 e.setEmployeeRole(employee.getEmployeeRole());
 
             employeeRepo.save(e);
-        } else {
-            model.addAttribute("errorMessage", "Employee with ID " + employee.getId() + " not found.");
         }
 
         return "redirect:/";
     }
 
-    // Delete an employee by ID
     @PostMapping("/remove")
-    public String removeEmployee(@ModelAttribute Employee employee, Model model) {
-        Optional<Employee> existingEmployee = employeeRepo.findById(employee.getId());
-
-        if (existingEmployee.isPresent()) {
-            employeeRepo.deleteById(employee.getId());
-        }
-
+    public String removeEmployee(@ModelAttribute Employee employee) {
+        employeeRepo.findById(employee.getId()).ifPresent(e -> employeeRepo.deleteById(e.getId()));
         return "redirect:/";
     }
 
-    // Delete all employees (confirmation required)
     @PostMapping("/remove/all")
-    public String removeAll(@ModelAttribute ConfirmationForm confirmationForm, Model model) {
-        String confirmation = confirmationForm.getConfirmation();
-
-        if ("Yes".equalsIgnoreCase(confirmation)) {
+    public String removeAll(@ModelAttribute ConfirmationForm confirmationForm) {
+        if ("Yes".equalsIgnoreCase(confirmationForm.getConfirmation())) {
             employeeRepo.deleteAll();
         }
-
         return "redirect:/";
     }
 }
