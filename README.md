@@ -4,7 +4,8 @@ An **Employee Management System** built with **Java Spring Boot** and **MongoDB*
 It provides RESTful APIs for CRUD operations and can serve as the backend foundation for a full HR or admin platform.
 
 ---
-<img width="1339" height="644" alt="image" src="https://github.com/user-attachments/assets/445e61fc-df6d-4c65-a735-cde662a211bd" />
+<img width="1313" height="644" alt="image" src="https://github.com/user-attachments/assets/2e734b27-be08-44a6-a345-833eeea140f7" />
+
 
 ## 🚀 Features
 
