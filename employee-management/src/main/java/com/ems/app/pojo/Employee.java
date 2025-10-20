@@ -15,7 +15,7 @@ public class Employee {
     @Id private String id;
     private String employeeName;
     private String employeeEmail;
-    private Long employeePhone;
+    private String employeePhone;
     private String employeeGender;
     private String employeeSalary;
     private String employeeRole;
