@@ -87,30 +87,49 @@ public class EmployeeController {
     }
 
     @PostMapping("/update")
-    public String updateEmployee(@ModelAttribute Employee employee) {
-        Optional<Employee> existing = employeeRepo.findById(employee.getId());
-        if (existing.isPresent()) {
-            Employee e = existing.get();
+    public String updateEmployee(@ModelAttribute Employee employee, Model model, RedirectAttributes redirectAttributes) {
+        Optional<Employee> existingOpt = employeeRepo.findById(employee.getId());
 
+        if (existingOpt.isPresent()) {
+            Employee existing = existingOpt.get();
+
+            // Check if the new email is already used by another employee
+            boolean emailExists = employeeRepo.findAll().stream()
+                    .anyMatch(emp ->
+                            !emp.getId().equals(existing.getId()) &&
+                                    emp.getEmployeeEmail().equalsIgnoreCase(employee.getEmployeeEmail()));
+
+            if (emailExists) {
+                // Return to index view with an error message without redirect
+                List<Employee> employees = employeeRepo.findAll();
+                model.addAttribute("employees", employees);
+                model.addAttribute("employee", existing); // keep current employee data
+                model.addAttribute("confirmationForm", new ConfirmationForm());
+                model.addAttribute("searchKeyword", "");
+                model.addAttribute("errorMessage", "⚠️ Email already in use! Please use another email.");
+
+                return "index";
+            }
+            //Update only non-empty fields
             if (employee.getEmployeeName() != null && !employee.getEmployeeName().isEmpty())
-                e.setEmployeeName(employee.getEmployeeName());
+                existing.setEmployeeName(employee.getEmployeeName());
 
             if (employee.getEmployeeEmail() != null && !employee.getEmployeeEmail().isEmpty())
-                e.setEmployeeEmail(employee.getEmployeeEmail());
+                existing.setEmployeeEmail(employee.getEmployeeEmail());
 
             if (employee.getEmployeePhone() != null)
-                e.setEmployeePhone(employee.getEmployeePhone());
+                existing.setEmployeePhone(employee.getEmployeePhone());
 
             if (employee.getEmployeeGender() != null && !employee.getEmployeeGender().isEmpty())
-                e.setEmployeeGender(employee.getEmployeeGender());
+                existing.setEmployeeGender(employee.getEmployeeGender());
 
             if (employee.getEmployeeSalary() != null && !employee.getEmployeeSalary().isEmpty())
-                e.setEmployeeSalary(employee.getEmployeeSalary());
+                existing.setEmployeeSalary(employee.getEmployeeSalary());
 
             if (employee.getEmployeeRole() != null && !employee.getEmployeeRole().isEmpty())
-                e.setEmployeeRole(employee.getEmployeeRole());
+                existing.setEmployeeRole(employee.getEmployeeRole());
 
-            employeeRepo.save(e);
+            employeeRepo.save(existing);
         }
 
         return "redirect:/";
